@@ -12,10 +12,10 @@ model.eval()  # Set to eval mode to improve performance
 # Initialize FastAPI app
 app = FastAPI()
 
-# Add CORS middleware to allow requests from any origin (or specify your extension's domain if needed)
+# Add CORS middleware to allow requests from any origin (important for your Chrome extension)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can specify a list of allowed origins, e.g., ["https://your-extension-url.com"]
+    allow_origins=["*"],  # Allow requests from any origin
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
@@ -28,19 +28,21 @@ class TextInput(BaseModel):
 # POST route to predict bias
 @app.post("/predict_bias")
 def predict_bias(input: TextInput):
+    # Tokenize the input text
     inputs = tokenizer(input.text, return_tensors="pt", truncation=True, padding=True)
-    with torch.no_grad():
+    with torch.no_grad():  # Disable gradient computation for inference
         outputs = model(**inputs)
         logits = outputs.logits
-        predicted_class = torch.argmax(logits, dim=1).item()
+        predicted_class = torch.argmax(logits, dim=1).item()  # Get the predicted class index
 
-    # Map predicted class to label
+    # Map the predicted class to the corresponding label (bias type)
     label_map = {
         0: "Left",
         1: "Center",
         2: "Right"
     }
 
+    # Return the prediction
     return {
         "text": input.text,
         "predicted_class": predicted_class,
@@ -51,9 +53,3 @@ def predict_bias(input: TextInput):
 @app.get("/")
 def read_root():
     return {"message": "BiasCheck API is running. Use POST /predict_bias with JSON input."}
-
-# Optional: GET route for testing directly from browser
-@app.get("/predict_bias")
-def demo_predict_bias():
-    sample_input = TextInput(text="The government's new initiative is a remarkable step forward.")
-    return predict_bias(sample_input)
